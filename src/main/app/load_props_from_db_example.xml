@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+	<http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8082" doc:name="HTTP Listener Configuration"/>
+	<spring:beans>
+	
+		<spring:bean id="dataSource" name="myCon" class="org.enhydra.jdbc.standard.StandardDataSource">
+			<spring:property name="url" value="jdbc:oracle:thin:@localhost:1521/orcl;user=api;password=mule"/>
+			<spring:property name="driverName" value="oracle.jdbc.driver.OracleDriver" />
+		</spring:bean>
+		
+		<spring:bean id="OracledataSource" class="org.apache.commons.dbcp.BasicDataSource"    destroy-method="close" name="OracledataSource"> 
+	        <spring:property name="driverClassName" value="oracle.jdbc.driver.OracleDriver"/>
+	        <spring:property name="removeAbandoned" value="true"/> 
+	        <spring:property name="initialSize" value="10"/> 
+	        <spring:property name="maxActive" value="50"/>
+			<spring:property name="url" value="jdbc:oracle:thin:@localhost:1521/orcl"/>
+			<spring:property name="password" value="mule"/>
+			<spring:property name="username" value="api"/> 
+        </spring:bean> 
+        
+		<spring:bean name="DatabaseConfiguration" class="org.apache.commons.configuration.DatabaseConfiguration">
+	        <spring:constructor-arg type="javax.sql.DataSource" ref="OracledataSource" />
+	        <spring:constructor-arg index="1" value="custom_properties" />
+	        <spring:constructor-arg index="2" value="api_name" />
+	        <spring:constructor-arg index="3" value="field_name" />
+	        <spring:constructor-arg index="4" value="field_value" />
+	        <spring:constructor-arg index="5" value="load_props_from_db_example" />
+    		</spring:bean>
+    		
+    		<spring:bean name="CommonsConfigurationFactoryBean" class="org.springmodules.commons.configuration.CommonsConfigurationFactoryBean">
+        		<spring:constructor-arg ref="DatabaseConfiguration" />
+    		</spring:bean>
+    		
+    		<spring:bean name="PropertyPlaceholderConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        		<spring:property name="properties" ref="CommonsConfigurationFactoryBean" />
+        		<spring:property name="ignoreUnresolvablePlaceholders" value="true" />
+    		</spring:bean>
+		
+	</spring:beans>
+	<db:generic-config name="Oracle_Database_Configuration" dataSource-ref="OracledataSource" doc:name="Generic Database Configuration"/>
+	<flow name="load_props_from_db_exampleFlow">
+		<http:listener config-ref="HTTP_Listener_Configuration" path="/props/db" doc:name="HTTP"/>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	apiName: p('apiName'),
+	apiVersion: p('apiVersion'),
+	apiInstance: p('apiInstance'),
+	sysPath: p('sysPath')
+}]]></dw:set-payload>
+		</dw:transform-message>
+	</flow>
+</mule>
